@@ -1,0 +1,185 @@
+[
+  {
+    "id": "r1",
+    "title": "Sheet Pan Chicken & Veggies",
+    "ingredients": [
+      { "name": "chicken thighs", "quantity": 4, "unit": "count" },
+      { "name": "broccoli", "quantity": 2, "unit": "cups" },
+      { "name": "bell pepper", "quantity": 1, "unit": "count" },
+      { "name": "olive oil", "quantity": 3, "unit": "tbsp" },
+      { "name": "garlic powder", "quantity": 1, "unit": "tsp" },
+      { "name": "salt", "quantity": 1, "unit": "tsp" }
+    ],
+    "steps": [
+      "Preheat oven to 425°F.",
+      "Toss chicken and vegetables with olive oil, garlic powder, and salt.",
+      "Spread on a sheet pan and roast 25 minutes until chicken is cooked through."
+    ],
+    "prepTimeMins": 10,
+    "cookTimeMins": 25,
+    "tags": ["gluten-free", "dairy-free"],
+    "servings": 4,
+    "bulkCookable": false,
+    "weekdayFriendly": true,
+    "rating": 5,
+    "notes": "Toddler loves the broccoli when it gets a little crispy."
+  },
+  {
+    "id": "r2",
+    "title": "Big Batch Bolognese",
+    "ingredients": [
+      { "name": "ground beef", "quantity": 500, "unit": "g" },
+      { "name": "onion", "quantity": 1, "unit": "count" },
+      { "name": "garlic", "quantity": 3, "unit": "cloves" },
+      { "name": "canned tomatoes", "quantity": 400, "unit": "g" },
+      { "name": "tomato paste", "quantity": 2, "unit": "tbsp" },
+      { "name": "olive oil", "quantity": 2, "unit": "tbsp" },
+      { "name": "pasta", "quantity": 400, "unit": "g" }
+    ],
+    "steps": [
+      "Sauté onion and garlic in olive oil until soft.",
+      "Brown ground beef, drain excess fat.",
+      "Add tomatoes and tomato paste; simmer 45 minutes.",
+      "Cook pasta separately; serve with sauce."
+    ],
+    "prepTimeMins": 15,
+    "cookTimeMins": 60,
+    "tags": ["dairy-free"],
+    "servings": 6,
+    "bulkCookable": true,
+    "weekdayFriendly": false,
+    "rating": 5,
+    "notes": "Make on Sunday, reheat through the week. Freezes well."
+  },
+  {
+    "id": "r3",
+    "title": "Veggie Stir Fry with Rice",
+    "ingredients": [
+      { "name": "rice", "quantity": 300, "unit": "g" },
+      { "name": "broccoli", "quantity": 1, "unit": "cups" },
+      { "name": "carrot", "quantity": 2, "unit": "count" },
+      { "name": "soy sauce", "quantity": 3, "unit": "tbsp" },
+      { "name": "sesame oil", "quantity": 1, "unit": "tbsp" },
+      { "name": "garlic", "quantity": 2, "unit": "cloves" },
+      { "name": "eggs", "quantity": 2, "unit": "count" }
+    ],
+    "steps": [
+      "Cook rice per package instructions.",
+      "Stir fry garlic and vegetables in sesame oil for 5 minutes.",
+      "Push to side, scramble eggs in center, mix together.",
+      "Add soy sauce, toss, and serve over rice."
+    ],
+    "prepTimeMins": 10,
+    "cookTimeMins": 20,
+    "tags": ["vegetarian", "dairy-free"],
+    "servings": 4,
+    "bulkCookable": false,
+    "weekdayFriendly": true,
+    "rating": 4
+  },
+  {
+    "id": "r4",
+    "title": "Slow Cooker Chicken Soup",
+    "ingredients": [
+      { "name": "chicken breast", "quantity": 500, "unit": "g" },
+      { "name": "carrot", "quantity": 3, "unit": "count" },
+      { "name": "celery", "quantity": 3, "unit": "stalks" },
+      { "name": "onion", "quantity": 1, "unit": "count" },
+      { "name": "garlic", "quantity": 2, "unit": "cloves" },
+      { "name": "chicken broth", "quantity": 1, "unit": "litre" },
+      { "name": "egg noodles", "quantity": 200, "unit": "g" },
+      { "name": "salt", "quantity": 1, "unit": "tsp" }
+    ],
+    "steps": [
+      "Add chicken, vegetables, garlic, broth, and salt to slow cooker.",
+      "Cook on LOW 6-8 hours or HIGH 3-4 hours.",
+      "Shred chicken with forks.",
+      "Cook noodles separately; add to bowls when serving."
+    ],
+    "prepTimeMins": 15,
+    "cookTimeMins": 360,
+    "tags": ["dairy-free"],
+    "servings": 6,
+    "bulkCookable": true,
+    "weekdayFriendly": false,
+    "rating": 5,
+    "notes": "Great for toddlers — soft noodles and mild flavor. Start in the morning."
+  },
+  {
+    "id": "r5",
+    "title": "Salmon with Roasted Potatoes",
+    "ingredients": [
+      { "name": "salmon fillet", "quantity": 4, "unit": "count" },
+      { "name": "baby potatoes", "quantity": 500, "unit": "g" },
+      { "name": "olive oil", "quantity": 3, "unit": "tbsp" },
+      { "name": "lemon", "quantity": 1, "unit": "count" },
+      { "name": "dill", "quantity": 2, "unit": "tsp" },
+      { "name": "salt", "quantity": 1, "unit": "tsp" }
+    ],
+    "steps": [
+      "Preheat oven to 400°F. Halve potatoes, toss with 2 tbsp olive oil and salt.",
+      "Roast potatoes 20 minutes.",
+      "Place salmon on same pan, drizzle with remaining oil, squeeze lemon, sprinkle dill.",
+      "Roast 12-15 more minutes until salmon flakes easily."
+    ],
+    "prepTimeMins": 10,
+    "cookTimeMins": 35,
+    "tags": ["gluten-free", "dairy-free"],
+    "servings": 4,
+    "bulkCookable": false,
+    "weekdayFriendly": false,
+    "rating": 4
+  },
+  {
+    "id": "r6",
+    "title": "Black Bean Tacos",
+    "ingredients": [
+      { "name": "black beans", "quantity": 400, "unit": "g" },
+      { "name": "corn tortillas", "quantity": 8, "unit": "count" },
+      { "name": "avocado", "quantity": 2, "unit": "count" },
+      { "name": "lime", "quantity": 1, "unit": "count" },
+      { "name": "cumin", "quantity": 1, "unit": "tsp" },
+      { "name": "garlic powder", "quantity": 0.5, "unit": "tsp" },
+      { "name": "shredded cheese", "quantity": 0.5, "unit": "cups" }
+    ],
+    "steps": [
+      "Warm beans with cumin and garlic powder in a pan.",
+      "Warm tortillas in a dry pan or microwave.",
+      "Mash avocado with lime juice.",
+      "Assemble tacos with beans, avocado, and cheese."
+    ],
+    "prepTimeMins": 10,
+    "cookTimeMins": 10,
+    "tags": ["vegetarian", "gluten-free"],
+    "servings": 4,
+    "bulkCookable": false,
+    "weekdayFriendly": true,
+    "rating": 4,
+    "notes": "Toddler loves tacos — let them assemble their own!"
+  },
+  {
+    "id": "r7",
+    "title": "Pasta with Marinara",
+    "ingredients": [
+      { "name": "pasta", "quantity": 400, "unit": "g" },
+      { "name": "canned tomatoes", "quantity": 400, "unit": "g" },
+      { "name": "garlic", "quantity": 2, "unit": "cloves" },
+      { "name": "olive oil", "quantity": 2, "unit": "tbsp" },
+      { "name": "basil", "quantity": 1, "unit": "tsp" },
+      { "name": "parmesan", "quantity": 0.25, "unit": "cups" }
+    ],
+    "steps": [
+      "Cook pasta per package instructions.",
+      "Sauté garlic in olive oil until fragrant.",
+      "Add canned tomatoes and basil; simmer 15 minutes.",
+      "Toss with pasta and top with parmesan."
+    ],
+    "prepTimeMins": 5,
+    "cookTimeMins": 20,
+    "tags": ["vegetarian"],
+    "servings": 4,
+    "bulkCookable": false,
+    "weekdayFriendly": true,
+    "rating": 4
+  }
+]
