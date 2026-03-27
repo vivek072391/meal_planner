@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Recipe, RecipeIngredient, DietaryTag } from '../types';
 import { generateId } from '../utils';
+import ImportFromLink from './ImportFromLink';
 
 interface Props {
   recipes: Recipe[];
@@ -35,6 +36,7 @@ export default function RecipeManager({ recipes, onAdd, onUpdate, onDelete, onIm
   const [stepsText, setStepsText] = useState('');
   const [search, setSearch] = useState('');
   const [importError, setImportError] = useState('');
+  const [showLinkImport, setShowLinkImport] = useState(false);
 
   function openNew() {
     setEditing(null);
@@ -92,6 +94,18 @@ export default function RecipeManager({ recipes, onAdd, onUpdate, onDelete, onIm
     }));
   }
 
+  function handleLinkImport(partial: Partial<Recipe>) {
+    setShowLinkImport(false);
+    setEditing(null);
+    const merged = { ...EMPTY_RECIPE, ...partial };
+    setForm(merged);
+    setIngredientLine(
+      (partial.ingredients ?? []).map((i) => `${i.quantity} ${i.unit} ${i.name}`).join('\n')
+    );
+    setStepsText((partial.steps ?? []).join('\n'));
+    setShowForm(true);
+  }
+
   function handleImportJSON(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -142,6 +156,12 @@ export default function RecipeManager({ recipes, onAdd, onUpdate, onDelete, onIm
         <button onClick={openNew} className="bg-green-600 text-white px-3 py-1 rounded text-sm">
           + Add Recipe
         </button>
+        <button
+          onClick={() => setShowLinkImport(true)}
+          className="bg-purple-600 text-white px-3 py-1 rounded text-sm"
+        >
+          🔗 Import from Link
+        </button>
         <label className="bg-blue-600 text-white px-3 py-1 rounded text-sm cursor-pointer">
           Import JSON
           <input type="file" accept=".json" className="hidden" onChange={handleImportJSON} />
@@ -149,6 +169,13 @@ export default function RecipeManager({ recipes, onAdd, onUpdate, onDelete, onIm
       </div>
 
       {importError && <p className="text-red-500 text-sm mb-2">{importError}</p>}
+
+      {showLinkImport && (
+        <ImportFromLink
+          onImport={handleLinkImport}
+          onClose={() => setShowLinkImport(false)}
+        />
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-start justify-center z-50 overflow-y-auto py-8">
