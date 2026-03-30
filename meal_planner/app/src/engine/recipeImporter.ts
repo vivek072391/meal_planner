@@ -1,11 +1,31 @@
 import type { Recipe, RecipeIngredient } from '../types';
 import { generateId } from '../utils';
 
-const CORS_PROXY = 'https://corsproxy.io/?';
+// Sites known to block automated access (Cloudflare or similar bot protection)
+const BLOCKED_SITES = [
+  'allrecipes.com',
+  'foodnetwork.com',
+  'cooking.nytimes.com',
+  'nytimes.com/recipes',
+  'epicurious.com',
+  'delish.com',
+  'tasty.co',
+];
 
 /** Detect if a URL is an Instagram post/reel */
 export function isInstagramUrl(url: string): boolean {
   return /instagram\.com\/(p|reel|tv)\//i.test(url);
+}
+
+/** Detect if a URL is from a site known to block automated access */
+export function isBlockedSite(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    const match = BLOCKED_SITES.find((s) => hostname.includes(s));
+    return match ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -13,11 +33,44 @@ export function isInstagramUrl(url: string): boolean {
  * Returns a partial Recipe on success, throws on failure.
  */
 export async function importFromUrl(url: string): Promise<Partial<Recipe>> {
-  const proxied = CORS_PROXY + encodeURIComponent(url);
-  const res = await fetch(proxied);
-  if (!res.ok) throw new Error(`Failed to fetch page (${res.status})`);
-  const html = await res.text();
+  // Use allorigins.win — free CORS proxy that wraps response in JSON
+  const proxied = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+  let html: string;
+  try {
+    const res = await fetch(proxied);
+    if (!res.ok) throw new Error(`Proxy returned ${res.status}`);
+    const data = await res.json();
+    html = data.contents ?? '';
+  } catch {
+    throw new Error(
+      'Could not reach the page. Check your internet connection and try again.'
+    );
+  }
+
+  if (!html || html.length < 500) {
+    throw new Error('The page returned no content. Try the Paste Text option instead.');
+  }
+
+  // Detect Cloudflare / bot-protection challenge pages
+  if (
+    html.includes('Just a moment') ||
+    html.includes('challenge-platform') ||
+    html.includes('Enable JavaScript and cookies to continue') ||
+    html.includes('cf-browser-verification')
+  ) {
+    const err = new Error('CLOUDFLARE_BLOCKED');
+    (err as Error & { isCloudflareBlocked: boolean }).isCloudflareBlocked = true;
+    throw err;
+  }
+
   return parseRecipeFromHtml(html, url);
+}
+
+export function isCloudflareBlockedError(e: unknown): boolean {
+  return (
+    e instanceof Error &&
+    (e as Error & { isCloudflareBlocked?: boolean }).isCloudflareBlocked === true
+  );
 }
 
 /** Parse schema.org Recipe JSON-LD from an HTML page */

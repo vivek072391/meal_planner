@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import type { Recipe } from '../types';
-import { importFromUrl, parseFromText, isInstagramUrl } from '../engine/recipeImporter';
+import {
+  importFromUrl,
+  parseFromText,
+  isInstagramUrl,
+  isBlockedSite,
+  isCloudflareBlockedError,
+} from '../engine/recipeImporter';
 
 interface Props {
   onImport: (recipe: Partial<Recipe>) => void;
@@ -14,19 +20,30 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
   const [url, setUrl] = useState('');
   const [pasteText, setPasteText] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{ message: string; isBlocked?: boolean } | null>(null);
 
   const isInsta = isInstagramUrl(url);
+  const blockedSite = isBlockedSite(url);
+  const cantAutoFetch = isInsta || !!blockedSite;
+
+  function switchToPaste() {
+    setMode('paste');
+    setError(null);
+  }
 
   async function handleFetchUrl() {
     if (!url.trim()) return;
-    setError('');
+    setError(null);
     setLoading(true);
     try {
       const recipe = await importFromUrl(url.trim());
       onImport(recipe);
     } catch (e) {
-      setError((e as Error).message);
+      if (isCloudflareBlockedError(e)) {
+        setError({ message: 'blocked', isBlocked: true });
+      } else {
+        setError({ message: (e as Error).message });
+      }
     } finally {
       setLoading(false);
     }
@@ -34,12 +51,12 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
 
   function handlePasteImport() {
     if (!pasteText.trim()) return;
-    setError('');
+    setError(null);
     try {
       const recipe = parseFromText(pasteText.trim());
       onImport(recipe);
     } catch (e) {
-      setError((e as Error).message);
+      setError({ message: (e as Error).message });
     }
   }
 
@@ -56,7 +73,7 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
         {/* Mode toggle */}
         <div className="flex rounded-lg border overflow-hidden mb-5 text-sm">
           <button
-            onClick={() => { setMode('url'); setError(''); }}
+            onClick={() => { setMode('url'); setError(null); }}
             className={`flex-1 py-2 font-medium transition-colors ${
               mode === 'url' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
@@ -64,7 +81,7 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
             🔗 Recipe URL
           </button>
           <button
-            onClick={() => { setMode('paste'); setError(''); }}
+            onClick={() => { setMode('paste'); setError(null); }}
             className={`flex-1 py-2 font-medium transition-colors ${
               mode === 'paste' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
             }`}
@@ -76,43 +93,72 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
         {mode === 'url' && (
           <div>
             <p className="text-sm text-gray-500 mb-3">
-              Paste a link to any recipe page (AllRecipes, Food Network, NYT Cooking, food blogs, etc.)
-              and we'll extract the recipe automatically.
+              Paste a recipe link and we'll extract it automatically. Works with most food blogs
+              and recipe sites.
             </p>
+
+            {/* Upfront warning for known blocked sites */}
+            {blockedSite && !isInsta && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-sm text-amber-800">
+                <strong>⚠️ {blockedSite} blocks automated access.</strong> This site uses
+                bot protection so automatic import won't work.{' '}
+                <button onClick={switchToPaste} className="underline font-medium">
+                  Use Paste Text instead
+                </button>{' '}
+                — copy the recipe from the page and paste it here.
+              </div>
+            )}
 
             {isInsta && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-sm text-amber-800">
                 <strong>Instagram detected.</strong> Instagram requires a login to view posts, so
-                automatic import won't work. Switch to{' '}
-                <button
-                  onClick={() => setMode('paste')}
-                  className="underline font-medium"
-                >
-                  Paste Text
+                automatic import won't work.{' '}
+                <button onClick={switchToPaste} className="underline font-medium">
+                  Use Paste Text instead
                 </button>{' '}
-                and copy-paste the recipe from the caption instead.
+                — copy the caption from the post and paste it here.
               </div>
             )}
 
             <input
               type="url"
               className="border rounded w-full px-3 py-2 text-sm mb-3"
-              placeholder="https://www.allrecipes.com/recipe/..."
+              placeholder="https://cafedelites.com/recipe/..."
               value={url}
-              onChange={(e) => { setUrl(e.target.value); setError(''); }}
-              onKeyDown={(e) => e.key === 'Enter' && !isInsta && handleFetchUrl()}
+              onChange={(e) => { setUrl(e.target.value); setError(null); }}
+              onKeyDown={(e) => e.key === 'Enter' && !cantAutoFetch && handleFetchUrl()}
             />
 
-            {error && (
+            {/* Cloudflare blocked error */}
+            {error?.isBlocked && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-sm text-amber-800">
+                <p className="font-medium mb-1">⚠️ This site blocked the import request.</p>
+                <p className="mb-2">
+                  Many large recipe sites (AllRecipes, Food Network, NYT Cooking) use bot
+                  protection that prevents automated access.
+                </p>
+                <p>
+                  <strong>Workaround:</strong> Open the recipe in your browser, select all the
+                  text (Cmd+A), copy it, then{' '}
+                  <button onClick={switchToPaste} className="underline font-medium">
+                    switch to Paste Text
+                  </button>{' '}
+                  and paste it there.
+                </p>
+              </div>
+            )}
+
+            {/* Generic error */}
+            {error && !error.isBlocked && (
               <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-3 mb-3">
-                {error}
-                {error.includes('No recipe data') && (
-                  <p className="mt-1 text-red-500">
-                    Try the{' '}
-                    <button onClick={() => setMode('paste')} className="underline">
+                {error.message}
+                {error.message.includes('No recipe data') && (
+                  <p className="mt-1">
+                    Try{' '}
+                    <button onClick={switchToPaste} className="underline">
                       Paste Text
                     </button>{' '}
-                    option instead.
+                    instead.
                   </p>
                 )}
               </div>
@@ -124,7 +170,7 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
               </button>
               <button
                 onClick={handleFetchUrl}
-                disabled={loading || !url.trim() || isInsta}
+                disabled={loading || !url.trim() || cantAutoFetch}
                 className="px-4 py-1.5 rounded bg-green-600 text-white text-sm disabled:opacity-50 flex items-center gap-2"
               >
                 {loading && (
@@ -142,24 +188,29 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
         {mode === 'paste' && (
           <div>
             <p className="text-sm text-gray-500 mb-1">
-              Paste the recipe text below — from an Instagram caption, a copied web page, or anywhere else.
+              Paste the recipe text — from an Instagram caption, a copied web page, or anywhere else.
+            </p>
+            <p className="text-xs text-gray-400 mb-1">
+              <strong>From AllRecipes / any website:</strong> Open the page → Cmd+A to select all → Cmd+C to copy → paste below.
             </p>
             <p className="text-xs text-gray-400 mb-3">
-              <strong>Instagram tip:</strong> Open the post → tap "···" → Copy → paste here.
-              For best results, include an "Ingredients:" and "Instructions:" section header.
+              <strong>From Instagram:</strong> Open the post → tap "···" → Copy → paste below.
+            </p>
+            <p className="text-xs text-gray-300 mb-3">
+              Tip: for best results, include "Ingredients:" and "Instructions:" as section headers.
             </p>
 
             <textarea
               className="border rounded w-full px-3 py-2 text-sm font-mono mb-3"
               rows={12}
-              placeholder={`Lemon Garlic Pasta\n\nIngredients:\n2 cups pasta\n3 cloves garlic\n2 tbsp olive oil\n1 lemon\n\nInstructions:\n1. Cook pasta per package\n2. Sauté garlic in oil\n3. Toss with pasta and lemon juice`}
+              placeholder={`Easy Tuna Patties\n\nIngredients:\n2 cans tuna\n1 egg\n1/4 cup breadcrumbs\n1 tbsp mayo\n\nInstructions:\n1. Mix all ingredients\n2. Form into patties\n3. Cook 3 min per side`}
               value={pasteText}
-              onChange={(e) => { setPasteText(e.target.value); setError(''); }}
+              onChange={(e) => { setPasteText(e.target.value); setError(null); }}
             />
 
             {error && (
               <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-3 mb-3">
-                {error}
+                {error.message}
               </p>
             )}
 
