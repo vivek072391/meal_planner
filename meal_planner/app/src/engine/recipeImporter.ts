@@ -164,22 +164,61 @@ function normalizeUnit(u: string): string {
 function parseInstructions(raw: unknown): string[] {
   if (!raw) return [];
   if (typeof raw === 'string') {
-    return raw.split(/\n+/).map((s) => s.trim()).filter(Boolean);
+    return raw.split(/\n+/).map((s) => stripHtml(s)).filter(Boolean);
   }
   if (Array.isArray(raw)) {
-    return raw
-      .map((item) => {
-        if (typeof item === 'string') return item.trim();
-        if (typeof item === 'object' && item !== null) {
-          const obj = item as Record<string, unknown>;
-          // HowToStep
-          return ((obj['text'] ?? obj['name'] ?? '') as string).trim();
+    const steps: string[] = [];
+    for (const item of raw) {
+      if (typeof item === 'string') {
+        const s = stripHtml(item);
+        if (s) steps.push(s);
+        continue;
+      }
+      if (typeof item === 'object' && item !== null) {
+        const obj = item as Record<string, unknown>;
+        const type = obj['@type'];
+
+        // HowToSection: has itemListElement array of HowToStep
+        if (type === 'HowToSection' && Array.isArray(obj['itemListElement'])) {
+          const sectionName = obj['name'] as string | undefined;
+          if (sectionName) steps.push(`— ${sectionName} —`);
+          for (const step of obj['itemListElement'] as unknown[]) {
+            const s = extractStepText(step);
+            if (s) steps.push(s);
+          }
+          continue;
         }
-        return '';
-      })
-      .filter(Boolean);
+
+        // HowToStep or plain object with text/name
+        const s = extractStepText(item);
+        if (s) steps.push(s);
+      }
+    }
+    return steps;
   }
   return [];
+}
+
+function extractStepText(item: unknown): string {
+  if (typeof item === 'string') return stripHtml(item);
+  if (typeof item === 'object' && item !== null) {
+    const obj = item as Record<string, unknown>;
+    return stripHtml((obj['text'] ?? obj['name'] ?? '') as string);
+  }
+  return '';
+}
+
+/** Strip HTML tags and decode common entities */
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Parse ISO 8601 duration string to minutes. e.g. "PT1H30M" -> 90 */
