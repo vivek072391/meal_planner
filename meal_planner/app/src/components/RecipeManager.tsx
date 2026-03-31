@@ -337,7 +337,20 @@ export default function RecipeManager({ recipes, onAdd, onUpdate, onDelete, onIm
                 </button>
               </div>
             </div>
-            {'⭐'.repeat(r.rating ?? 0)}
+            <div className="flex items-center justify-between mt-1">
+              <span>{'⭐'.repeat(r.rating ?? 0)}</span>
+              {r.source && (
+                <a
+                  href={r.source}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-600 truncate max-w-[140px]"
+                  title={r.source}
+                >
+                  🔗 {(() => { try { return new URL(r.source).hostname.replace(/^www\./, ''); } catch { return 'source'; } })()}
+                </a>
+              )}
+            </div>
           </div>
         ))}
       </div>
