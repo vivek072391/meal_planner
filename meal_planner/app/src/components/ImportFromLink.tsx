@@ -148,19 +148,27 @@ export default function ImportFromLink({ onImport, onClose }: Props) {
               </div>
             )}
 
+            {/* No recipe schema error */}
+            {error && !error.isBlocked && error.message === 'NO_RECIPE_SCHEMA' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-sm text-amber-800">
+                <p className="font-medium mb-1">⚠️ This site doesn't include structured recipe data.</p>
+                <p className="mb-2">
+                  Sites like Minimalist Baker, Half Baked Harvest, and The Kitchn don't embed
+                  machine-readable recipe data, so automatic extraction isn't possible.
+                </p>
+                <p>
+                  <strong>Workaround:</strong> Open the recipe, copy the text (Cmd+A → Cmd+C), then{' '}
+                  <button onClick={switchToPaste} className="underline font-medium">
+                    switch to Paste Text
+                  </button>.
+                </p>
+              </div>
+            )}
+
             {/* Generic error */}
-            {error && !error.isBlocked && (
+            {error && !error.isBlocked && error.message !== 'NO_RECIPE_SCHEMA' && (
               <div className="text-red-600 text-sm bg-red-50 border border-red-200 rounded p-3 mb-3">
                 {error.message}
-                {error.message.includes('No recipe data') && (
-                  <p className="mt-1">
-                    Try{' '}
-                    <button onClick={switchToPaste} className="underline">
-                      Paste Text
-                    </button>{' '}
-                    instead.
-                  </p>
-                )}
               </div>
             )}
 

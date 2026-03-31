@@ -4,11 +4,12 @@ import { generateId } from '../utils';
 // Sites known to block automated access (Cloudflare or similar bot protection)
 const BLOCKED_SITES = [
   'allrecipes.com',
+  'simplyrecipes.com',
+  'seriouseats.com',
   'foodnetwork.com',
   'cooking.nytimes.com',
   'nytimes.com/recipes',
   'epicurious.com',
-  'delish.com',
   'tasty.co',
 ];
 
@@ -106,7 +107,7 @@ function parseRecipeFromHtml(html: string, sourceUrl: string): Partial<Recipe> {
 
   if (!recipeData) {
     throw new Error(
-      'No recipe data found on this page. The site may not support structured recipe data.'
+      'NO_RECIPE_SCHEMA'
     );
   }
 
