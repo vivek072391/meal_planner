@@ -131,12 +131,98 @@ function parseRecipeFromHtml(html: string, sourceUrl: string): Partial<Recipe> {
   ) as Record<string, unknown> | undefined;
 
   if (!recipeData) {
-    throw new Error(
-      'NO_RECIPE_SCHEMA'
-    );
+    // Fallback: try microdata (itemprop attributes) — used by Smitten Kitchen, Jetpack, etc.
+    const microdata = parseMicrodata(html);
+    if (microdata) return { ...microdata, id: generateId(), source: sourceUrl };
+
+    throw new Error('NO_RECIPE_SCHEMA');
   }
 
   return mapSchemaToRecipe(recipeData, sourceUrl);
+}
+
+/**
+ * Parse schema.org Recipe from HTML microdata (itemprop attributes).
+ * Used by sites like Smitten Kitchen (Jetpack recipe plugin) that don't emit JSON-LD.
+ */
+function parseMicrodata(html: string): Partial<Recipe> | null {
+  const hasRecipe =
+    html.includes('itemtype="https://schema.org/Recipe"') ||
+    html.includes('itemtype="http://schema.org/Recipe"');
+  if (!hasRecipe) return null;
+
+  // Find the recipe container start and grab a 30KB chunk
+  let start = html.indexOf('itemtype="https://schema.org/Recipe"');
+  if (start === -1) start = html.indexOf('itemtype="http://schema.org/Recipe"');
+  const chunk = html.slice(start, start + 30000);
+
+  function getProp(prop: string): string {
+    const re = new RegExp(`itemprop="${prop}"[^>]*>([\\s\\S]*?)<\\/(?:span|p|li|div|td|h[1-6])>`, 'i');
+    const m = chunk.match(re);
+    return m ? stripHtml(m[1]) : '';
+  }
+
+  function getAllProps(prop: string): string[] {
+    const re = new RegExp(`itemprop="${prop}"[^>]*>([\\s\\S]*?)<\\/(?:span|p|li|div|td)>`, 'gi');
+    const results: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(chunk)) !== null) {
+      const val = stripHtml(m[1]);
+      if (val) results.push(val);
+    }
+    return results;
+  }
+
+  const title = getProp('name');
+  if (!title) return null;
+
+  const ingredients = getAllProps('recipeIngredient').map(parseIngredientString);
+
+  // Instructions: may be one block of prose or multiple steps
+  const instrBlocks = getAllProps('recipeInstructions');
+  const steps: string[] = [];
+  for (const block of instrBlocks) {
+    // Split on double newline or sentence-ending punctuation + newline
+    const sentences = block
+      .split(/\n{2,}|\.\s+(?=[A-Z])/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 10);
+    if (sentences.length > 1) {
+      // Re-attach periods stripped by the split
+      steps.push(...sentences.map((s) => (s.endsWith('.') ? s : s + '.')));
+    } else {
+      steps.push(block);
+    }
+  }
+
+  // Times: look for datetime="PT30M" or content="PT30M" on itemprop elements
+  function getDuration(prop: string): number {
+    const re = new RegExp(`itemprop="${prop}"[^>]*(?:datetime|content)="([^"]+)"`, 'i');
+    const m = chunk.match(re);
+    if (!m) return 0;
+    const hMatch = m[1].match(/(\d+)H/);
+    const minMatch = m[1].match(/(\d+)M/);
+    return (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (minMatch ? parseInt(minMatch[1]) : 0);
+  }
+
+  const prepTimeMins = getDuration('prepTime') || 10;
+  const cookTimeMins = getDuration('cookTime') || 20;
+
+  const yieldText = getProp('recipeYield');
+  const servings = parseInt(yieldText) || 4;
+
+  return {
+    title,
+    ingredients,
+    steps,
+    prepTimeMins,
+    cookTimeMins,
+    tags: [],
+    servings,
+    bulkCookable: false,
+    weekdayFriendly: prepTimeMins + cookTimeMins <= 30,
+    rating: 3,
+  };
 }
 
 /** Map schema.org Recipe fields to our Recipe type */
