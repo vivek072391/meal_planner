@@ -6,6 +6,7 @@ interface PlannerOptions {
   recipes: Recipe[];
   pantryItems: PantryItem[];
   weekStartDate: string;
+  plannedDays: number[]; // which days of week to fill (0=Sun … 6=Sat)
   existingPlan?: MealPlan; // for re-runs preserving overrides
 }
 
@@ -20,7 +21,7 @@ interface PlannerOptions {
  * 5. Avoid repeats within the week
  */
 export function generateMealPlan(options: PlannerOptions): MealPlan {
-  const { profile, recipes, weekStartDate, existingPlan } = options;
+  const { profile, recipes, weekStartDate, plannedDays, existingPlan } = options;
 
   const dates = getWeekDates(weekStartDate);
   const totalServings = profile.members.reduce((s, m) => s + m.servingMultiplier, 0);
@@ -33,13 +34,11 @@ export function generateMealPlan(options: PlannerOptions): MealPlan {
 
   // Pre-filter: remove recipes that violate hard constraints
   const eligible = recipes.filter((r) => {
-    // Allergy check: ingredient name must not contain any allergen keyword
     const hasAllergen = r.ingredients.some((ing) =>
       [...allAllergies].some((a) => ing.name.toLowerCase().includes(a))
     );
     if (hasAllergen) return false;
 
-    // Dietary restriction check: if family is vegetarian, recipe must be tagged vegetarian/vegan
     if (allRestrictions.has('vegetarian') && !r.tags.includes('vegetarian') && !r.tags.includes('vegan'))
       return false;
     if (allRestrictions.has('vegan') && !r.tags.includes('vegan')) return false;
@@ -50,28 +49,31 @@ export function generateMealPlan(options: PlannerOptions): MealPlan {
     return true;
   });
 
+  // Build initial slots — only planned days get a recipe; others stay null
   const daySlots: DaySlot[] = dates.map((date, i) => {
     const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+    const isPlanned = plannedDays.includes(dayOfWeek);
     const isBulkDay = profile.bulkDays.includes(dayOfWeek);
 
-    // Preserve manual overrides on re-run
+    // Preserve manual overrides on re-run, but only if the day is still planned
     const existingSlot = existingPlan?.daySlots.find((s) => s.date === date);
-    if (existingSlot?.manualOverride) return existingSlot;
+    if (existingSlot?.manualOverride && isPlanned) return existingSlot;
 
     return {
       date,
       recipeId: null,
       servings: Math.ceil(totalServings),
       manualOverride: false,
+      _isPlanned: isPlanned,
       _isBulkDay: isBulkDay,
       _dayIndex: i,
-    } as DaySlot & { _isBulkDay: boolean; _dayIndex: number };
+    } as DaySlot & { _isPlanned: boolean; _isBulkDay: boolean; _dayIndex: number };
   });
 
   const usedRecipeIds = new Set<string>();
-  const selectedIngredients = new Map<string, number>(); // name -> count of times used
+  const selectedIngredients = new Map<string, number>();
 
-  // Sort: bulk days first (to anchor shared ingredients), then weekdays
+  // Sort: bulk days first (to anchor shared ingredients), then remaining
   const sortedIndices = [...daySlots.keys()].sort((a, b) => {
     const aSlot = daySlots[a] as DaySlot & { _isBulkDay?: boolean };
     const bSlot = daySlots[b] as DaySlot & { _isBulkDay?: boolean };
@@ -81,13 +83,15 @@ export function generateMealPlan(options: PlannerOptions): MealPlan {
   });
 
   for (const idx of sortedIndices) {
-    const slot = daySlots[idx] as DaySlot & { _isBulkDay?: boolean };
+    const slot = daySlots[idx] as DaySlot & { _isPlanned?: boolean; _isBulkDay?: boolean };
+
+    // Skip days not in the planned set, and days already set (manual overrides)
+    if (!slot._isPlanned) continue;
     if (slot.manualOverride || slot.recipeId) continue;
 
     const dayOfWeek = new Date(slot.date + 'T12:00:00').getDay();
     const isBulkDay = profile.bulkDays.includes(dayOfWeek);
 
-    // Filter by day type
     const candidates = eligible.filter((r) => {
       if (usedRecipeIds.has(r.id)) return false;
       if (!isBulkDay && !r.weekdayFriendly) return false;
@@ -95,19 +99,16 @@ export function generateMealPlan(options: PlannerOptions): MealPlan {
     });
 
     if (candidates.length === 0) {
-      // Relax: allow any eligible recipe (may repeat)
       const fallback = eligible.find((r) => !usedRecipeIds.has(r.id)) ?? eligible[0] ?? null;
       slot.recipeId = fallback?.id ?? null;
     } else {
-      // Score each candidate
       const scored = candidates.map((r) => {
         const reuseScore = r.ingredients.reduce((sum, ing) => {
           return sum + (selectedIngredients.get(ing.name.toLowerCase()) ?? 0);
         }, 0);
         const bulkBonus = isBulkDay && r.bulkCookable ? 2 : 0;
         const rating = r.rating ?? 3;
-        const score = reuseScore * 3 + bulkBonus + rating;
-        return { recipe: r, score };
+        return { recipe: r, score: reuseScore * 3 + bulkBonus + rating };
       });
 
       scored.sort((a, b) => b.score - a.score);
@@ -121,7 +122,6 @@ export function generateMealPlan(options: PlannerOptions): MealPlan {
     }
   }
 
-  // Strip internal fields
   const cleanSlots: DaySlot[] = daySlots.map(({ date, recipeId, servings, manualOverride }) => ({
     date, recipeId, servings, manualOverride,
   }));

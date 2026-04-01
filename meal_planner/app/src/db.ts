@@ -62,6 +62,7 @@ export async function ensureDefaultProfile(): Promise<UserProfile> {
     weekStart: 0,
     weekdayMaxCookMins: 30,
     bulkDays: [0, 6], // Sunday and Saturday
+    plannedDays: [0, 1, 2, 3, 4, 5, 6], // all 7 days by default
   };
 
   await db.profiles.put(defaultProfile);

@@ -26,6 +26,7 @@ export interface UserProfile {
   weekStart: 0 | 1; // 0 = Sunday, 1 = Monday
   weekdayMaxCookMins: number; // default 30
   bulkDays: number[]; // day-of-week indices, e.g. [0, 6] for Sat/Sun
+  plannedDays: number[]; // day-of-week indices to plan meals for by default
 }
 
 export interface RecipeIngredient {

@@ -6,7 +6,7 @@ interface Props {
   allPlans: Map<string, MealPlan>;
   recipes: Recipe[];
   profile: UserProfile;
-  onGenerate: (weekStart: string) => void;
+  onGenerate: (weekStart: string, plannedDays: number[]) => void;
   onOverride: (weekStart: string, date: string, recipeId: string | null) => void;
   onMarkCooked: (date: string) => void;
   cookedDates: Set<string>;
@@ -18,6 +18,9 @@ const MONTH_NAMES = [
 ];
 const DAY_LABELS_SUN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DAY_LABELS_MON = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+// Day names ordered Sun-Sat for the picker (always fixed order for clarity)
+const DAY_PICKER_LABELS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -46,6 +49,11 @@ interface DayDetail {
   weekStart: string;
 }
 
+interface GenerateModal {
+  weekStart: string;
+  selectedDays: number[]; // day-of-week indices
+}
+
 export default function CalendarView({
   allPlans,
   recipes,
@@ -60,11 +68,15 @@ export default function CalendarView({
   const [viewMonth, setViewMonth] = useState(today.getMonth());
   const [detail, setDetail] = useState<DayDetail | null>(null);
   const [overrideRecipeId, setOverrideRecipeId] = useState<string>('');
+  const [generateModal, setGenerateModal] = useState<GenerateModal | null>(null);
 
   const recipeMap = new Map(recipes.map((r) => [r.id, r]));
   const todayStr = isoDate(today);
   const dayLabels = profile.weekStart === 0 ? DAY_LABELS_SUN : DAY_LABELS_MON;
   const weeks = getCalendarWeeks(viewYear, viewMonth, profile.weekStart);
+
+  // Fall back to all days for profiles created before this field existed
+  const defaultPlannedDays = profile.plannedDays ?? [0, 1, 2, 3, 4, 5, 6];
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
@@ -80,6 +92,30 @@ export default function CalendarView({
     setViewYear(today.getFullYear());
     setViewMonth(today.getMonth());
   }
+
+  // ── Generate modal ──────────────────────────────────────────────────────────
+
+  function openGenerateModal(weekStart: string) {
+    // Pre-populate with the profile default (or all 7 if not set)
+    setGenerateModal({ weekStart, selectedDays: [...defaultPlannedDays] });
+  }
+
+  function toggleGenerateDay(day: number) {
+    if (!generateModal) return;
+    const { selectedDays } = generateModal;
+    const next = selectedDays.includes(day)
+      ? selectedDays.filter((d) => d !== day)
+      : [...selectedDays, day].sort((a, b) => a - b);
+    setGenerateModal({ ...generateModal, selectedDays: next });
+  }
+
+  function confirmGenerate() {
+    if (!generateModal || generateModal.selectedDays.length === 0) return;
+    onGenerate(generateModal.weekStart, generateModal.selectedDays);
+    setGenerateModal(null);
+  }
+
+  // ── Day detail modal ────────────────────────────────────────────────────────
 
   function openDetail(date: string, weekStart: string) {
     const plan = allPlans.get(weekStart);
@@ -124,19 +160,15 @@ export default function CalendarView({
       )}
 
       {/*
-        Single flat CSS grid — header + all week cells are direct children of this
-        one element, so every column is guaranteed to align perfectly.
-        Using inline style to avoid any Tailwind v4 arbitrary-value parsing issues.
+        Single flat CSS grid — header + all week cells are direct children so
+        every column is guaranteed to align perfectly.
       */}
       <div
         className="border rounded-xl overflow-hidden bg-white shadow-sm"
         style={{ display: 'grid', gridTemplateColumns: '40px repeat(7, 1fr)' }}
       >
         {/* ── Header row ── */}
-        {/* Corner cell (above generate-button column) */}
         <div className="bg-gray-50 border-b border-r" />
-
-        {/* Day-of-week labels */}
         {dayLabels.map((label, i) => (
           <div
             key={label}
@@ -154,14 +186,13 @@ export default function CalendarView({
           const isLastWeek = weekIdx === weeks.length - 1;
           const rowBorder = isLastWeek ? '' : 'border-b';
 
-          // Generate / re-generate button cell
           const genCell = (
             <div
               key={`gen-${weekStart}`}
               className={`flex items-center justify-center bg-gray-50 border-r ${rowBorder} p-1`}
             >
               <button
-                onClick={() => onGenerate(weekStart)}
+                onClick={() => openGenerateModal(weekStart)}
                 disabled={recipes.length === 0}
                 title={hasPlan ? 'Re-generate this week' : 'Generate meal plan for this week'}
                 className={`w-7 h-7 flex items-center justify-center rounded-full text-xs font-bold transition-colors ${
@@ -175,7 +206,6 @@ export default function CalendarView({
             </div>
           );
 
-          // Seven day cells for this week
           const dayCells = week.map((date, dayIdx) => {
             const isLastDay = dayIdx === 6;
             const inMonth = new Date(date + 'T12:00:00').getMonth() === viewMonth;
@@ -204,7 +234,6 @@ export default function CalendarView({
                 onClick={() => clickable && openDetail(date, weekStart)}
                 className={`min-h-[72px] min-w-0 p-1.5 transition-colors overflow-hidden ${bg} ${rowBorder} ${isLastDay ? '' : 'border-r'} ${clickable ? 'cursor-pointer hover:brightness-95' : ''}`}
               >
-                {/* Date number badge */}
                 <div className="flex items-center justify-between mb-0.5">
                   <span
                     className={`text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full shrink-0 ${
@@ -220,7 +249,6 @@ export default function CalendarView({
                   {isCooked && inMonth && <span className="text-green-500 text-xs">✓</span>}
                 </div>
 
-                {/* Recipe name */}
                 {recipe && inMonth && (
                   <>
                     <p
@@ -234,8 +262,9 @@ export default function CalendarView({
                     </p>
                   </>
                 )}
+                {/* Show "—" for intentionally skipped days (slot exists but no recipe) */}
                 {!recipe && slot !== undefined && inMonth && (
-                  <p className="text-xs text-gray-300 italic">No meal</p>
+                  <p className="text-xs text-gray-300">—</p>
                 )}
               </div>
             );
@@ -256,17 +285,73 @@ export default function CalendarView({
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded bg-green-100 border border-green-200 inline-block" /> Cooked
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-5 h-5 rounded-full bg-green-600 text-white flex items-center justify-center font-bold text-xs">+</span>
-          Generate week
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-bold text-xs">↺</span>
-          Re-generate week
-        </span>
       </div>
 
-      {/* Day detail modal */}
+      {/* ── Generate modal ── */}
+      {generateModal && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          onClick={() => setGenerateModal(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="font-semibold text-gray-800 text-base">Plan this week</h3>
+              <button onClick={() => setGenerateModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              Week of {formatDate(generateModal.weekStart)} — choose which days to plan meals for
+            </p>
+
+            {/* Day toggles */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {DAY_PICKER_LABELS.map((label, day) => {
+                const selected = generateModal.selectedDays.includes(day);
+                return (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleGenerateDay(day)}
+                    className={`flex flex-col items-center py-2 rounded-lg border text-xs font-medium transition-colors ${
+                      selected
+                        ? 'bg-green-600 border-green-600 text-white'
+                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-400'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <p className="text-xs text-gray-400 text-center mb-4">
+              {generateModal.selectedDays.length === 0
+                ? 'Select at least one day'
+                : `${generateModal.selectedDays.length} meal${generateModal.selectedDays.length !== 1 ? 's' : ''} will be planned`}
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setGenerateModal(null)}
+                className="flex-1 border py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmGenerate}
+                disabled={generateModal.selectedDays.length === 0}
+                className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Day detail modal ── */}
       {detail && (
         <div
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"

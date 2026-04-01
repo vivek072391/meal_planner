@@ -101,7 +101,7 @@ export default function App() {
   }, []);
 
   // --- Planner operations ---
-  const handleGenerate = useCallback(async (weekStart: string) => {
+  const handleGenerate = useCallback(async (weekStart: string, plannedDays: number[]) => {
     if (!profile) return;
     const existingPlan = allPlans.get(weekStart);
     const plan = generateMealPlan({
@@ -109,6 +109,7 @@ export default function App() {
       recipes,
       pantryItems,
       weekStartDate: weekStart,
+      plannedDays,
       existingPlan,
     });
     await db.mealPlans.put(plan);

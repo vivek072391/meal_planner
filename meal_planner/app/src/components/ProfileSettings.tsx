@@ -45,6 +45,14 @@ export default function ProfileSettings({ profile, onSave }: Props) {
     updateProfile({ bulkDays });
   }
 
+  function togglePlannedDay(day: number) {
+    const current = profile.plannedDays ?? [0, 1, 2, 3, 4, 5, 6];
+    const plannedDays = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b);
+    updateProfile({ plannedDays });
+  }
+
   function toggleTag(memberId: string, tag: DietaryTag) {
     const member = profile.members.find((m) => m.id === memberId)!;
     const restrictions = member.dietaryRestrictions.includes(tag)
@@ -92,6 +100,29 @@ export default function ProfileSettings({ profile, onSave }: Props) {
               value={profile.weekdayMaxCookMins}
               onChange={(e) => updateProfile({ weekdayMaxCookMins: +e.target.value })}
             />
+          </div>
+        </div>
+        <div className="mt-3">
+          <label className="block text-sm font-medium mb-1">Default meal days</label>
+          <p className="text-xs text-gray-400 mb-2">Pre-selected when you generate a week's plan (you can change it each time)</p>
+          <div className="flex gap-2">
+            {DAYS.map((day, i) => {
+              const planned = (profile.plannedDays ?? [0, 1, 2, 3, 4, 5, 6]).includes(i);
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => togglePlannedDay(i)}
+                  className={`px-2 py-1 rounded text-xs border ${
+                    planned
+                      ? 'bg-green-100 border-green-500 text-green-700'
+                      : 'bg-white border-gray-300 text-gray-400'
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="mt-3">
