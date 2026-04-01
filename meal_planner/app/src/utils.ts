@@ -18,17 +18,18 @@ export function getWeekDates(weekStartDate: string): string[] {
 }
 
 /**
- * Get the start of the current week (Monday) as YYYY-MM-DD.
+ * Get the start of the current week as YYYY-MM-DD.
+ * weekStart: 0 = Sunday (default), 1 = Monday
  */
-export function currentWeekStart(weekStart: 0 | 1 = 1): string {
+export function currentWeekStart(weekStart: 0 | 1 = 0): string {
   const today = new Date();
   const day = today.getDay(); // 0=Sun, 1=Mon...
   const diff = weekStart === 1
     ? (day === 0 ? -6 : 1 - day)
     : -day;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  return monday.toISOString().slice(0, 10);
+  const start = new Date(today);
+  start.setDate(today.getDate() + diff);
+  return start.toISOString().slice(0, 10);
 }
 
 /** Format YYYY-MM-DD -> "Mon Jan 6" */

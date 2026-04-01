@@ -59,7 +59,7 @@ export async function ensureDefaultProfile(): Promise<UserProfile> {
         servingMultiplier: 0.5,
       },
     ],
-    weekStart: 1,
+    weekStart: 0,
     weekdayMaxCookMins: 30,
     bulkDays: [0, 6], // Sunday and Saturday
   };
