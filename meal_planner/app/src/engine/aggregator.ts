@@ -153,9 +153,35 @@ export function generateShoppingList(
     }
   }
 
+  // Second pass: collapse entries with the same canonical name into one row.
+  // e.g. "olive oil||ml" + "olive oil||unit" → single "olive oil" entry
+  // Priority: ml (volume) > g (weight) > everything else
+  const unitPriority = (u: BaseUnit) => u === 'ml' ? 0 : u === 'g' ? 1 : 2;
+  const merged = new Map<string, { name: string; baseQuantity: number; baseUnit: BaseUnit; sources: string[] }>();
+  for (const agg of aggregated.values()) {
+    const existing = merged.get(agg.name);
+    if (!existing) {
+      merged.set(agg.name, { ...agg, sources: [...agg.sources] });
+    } else {
+      // Merge sources
+      for (const s of agg.sources) {
+        if (!existing.sources.includes(s)) existing.sources.push(s);
+      }
+      if (existing.baseUnit === agg.baseUnit) {
+        // Same base unit — just add
+        existing.baseQuantity += agg.baseQuantity;
+      } else if (unitPriority(agg.baseUnit) < unitPriority(existing.baseUnit)) {
+        // Incoming entry has a better unit — promote it, discard the vague quantity
+        existing.baseUnit = agg.baseUnit;
+        existing.baseQuantity = agg.baseQuantity;
+      }
+      // else: existing has a better unit, keep it and ignore the vague quantity
+    }
+  }
+
   // Build items, subtract pantry, convert back to display units
   const items: ShoppingListItem[] = [];
-  for (const agg of aggregated.values()) {
+  for (const agg of merged.values()) {
     const { qty: totalQty, unit: displayUnit } = fromBase(agg.baseQuantity, agg.baseUnit);
 
     // Pantry subtraction in the same base unit
