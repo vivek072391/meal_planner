@@ -5,7 +5,7 @@ import { generateMealPlan } from './engine/planner';
 import { generateShoppingList } from './engine/aggregator';
 import RecipeManager from './components/RecipeManager';
 import PantryManager from './components/PantryManager';
-import WeeklyPlanner from './components/WeeklyPlanner';
+import CalendarView from './components/CalendarView';
 import ShoppingListView from './components/ShoppingListView';
 import ProfileSettings from './components/ProfileSettings';
 
@@ -24,7 +24,8 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
-  const [currentPlan, setCurrentPlan] = useState<MealPlan | null>(null);
+  const [allPlans, setAllPlans] = useState<Map<string, MealPlan>>(new Map());
+  const [activeWeekStart, setActiveWeekStart] = useState<string | null>(null);
   const [shoppingList, setShoppingList] = useState<ShoppingList | null>(null);
   const [cookedDates, setCookedDates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -36,13 +37,21 @@ export default function App() {
         ensureDefaultProfile(),
         db.recipes.toArray(),
         db.pantryItems.toArray(),
-        db.mealPlans.orderBy('weekStartDate').reverse().limit(1).toArray(),
+        db.mealPlans.toArray(),
         db.shoppingLists.orderBy('weekStartDate').reverse().limit(1).toArray(),
       ]);
       setProfile(p);
       setRecipes(r);
       setPantryItems(pantry);
-      if (plans.length > 0) setCurrentPlan(plans[0]);
+
+      const planMap = new Map(plans.map((pl) => [pl.weekStartDate, pl]));
+      setAllPlans(planMap);
+
+      if (plans.length > 0) {
+        const sorted = [...plans].sort((a, b) => b.weekStartDate.localeCompare(a.weekStartDate));
+        setActiveWeekStart(sorted[0].weekStartDate);
+      }
+
       if (lists.length > 0) setShoppingList(lists[0]);
       setLoading(false);
     }
@@ -94,36 +103,42 @@ export default function App() {
   // --- Planner operations ---
   const handleGenerate = useCallback(async (weekStart: string) => {
     if (!profile) return;
+    const existingPlan = allPlans.get(weekStart);
     const plan = generateMealPlan({
       profile,
       recipes,
       pantryItems,
       weekStartDate: weekStart,
-      existingPlan: currentPlan?.weekStartDate === weekStart ? currentPlan : undefined,
+      existingPlan,
     });
     await db.mealPlans.put(plan);
-    setCurrentPlan(plan);
+    setAllPlans((prev) => new Map(prev).set(weekStart, plan));
+    setActiveWeekStart(weekStart);
 
-    // Auto-generate shopping list
+    // Auto-generate shopping list for this week
     const list = generateShoppingList(plan, recipes, pantryItems);
     await db.shoppingLists.put(list);
     setShoppingList(list);
-  }, [profile, recipes, pantryItems, currentPlan]);
+  }, [profile, recipes, pantryItems, allPlans]);
 
-  const handleOverride = useCallback(async (date: string, recipeId: string | null) => {
-    if (!currentPlan) return;
+  const handleOverride = useCallback(async (weekStart: string, date: string, recipeId: string | null) => {
+    const plan = allPlans.get(weekStart);
+    if (!plan) return;
     const updated: MealPlan = {
-      ...currentPlan,
-      daySlots: currentPlan.daySlots.map((s) =>
+      ...plan,
+      daySlots: plan.daySlots.map((s) =>
         s.date === date ? { ...s, recipeId, manualOverride: true } : s
       ),
     };
     await db.mealPlans.put(updated);
-    setCurrentPlan(updated);
-    const list = generateShoppingList(updated, recipes, pantryItems);
-    await db.shoppingLists.put(list);
-    setShoppingList(list);
-  }, [currentPlan, recipes, pantryItems]);
+    setAllPlans((prev) => new Map(prev).set(weekStart, updated));
+
+    if (activeWeekStart === weekStart) {
+      const list = generateShoppingList(updated, recipes, pantryItems);
+      await db.shoppingLists.put(list);
+      setShoppingList(list);
+    }
+  }, [allPlans, activeWeekStart, recipes, pantryItems]);
 
   const handleMarkCooked = useCallback((date: string) => {
     setCookedDates((prev) => {
@@ -134,11 +149,13 @@ export default function App() {
   }, []);
 
   const handleRefreshShoppingList = useCallback(async () => {
-    if (!currentPlan) return;
-    const list = generateShoppingList(currentPlan, recipes, pantryItems);
+    if (!activeWeekStart) return;
+    const plan = allPlans.get(activeWeekStart);
+    if (!plan) return;
+    const list = generateShoppingList(plan, recipes, pantryItems);
     await db.shoppingLists.put(list);
     setShoppingList(list);
-  }, [currentPlan, recipes, pantryItems]);
+  }, [activeWeekStart, allPlans, recipes, pantryItems]);
 
   const handleSaveProfile = useCallback(async (p: UserProfile) => {
     await db.profiles.put(p);
@@ -189,8 +206,8 @@ export default function App() {
       {/* Main content */}
       <main className="flex-1 max-w-5xl mx-auto w-full">
         {tab === 'planner' && profile && (
-          <WeeklyPlanner
-            plan={currentPlan}
+          <CalendarView
+            allPlans={allPlans}
             recipes={recipes}
             profile={profile}
             onGenerate={handleGenerate}
@@ -223,7 +240,7 @@ export default function App() {
           <ShoppingListView
             shoppingList={shoppingList}
             onGenerate={handleRefreshShoppingList}
-            hasPlan={currentPlan !== null}
+            hasPlan={allPlans.size > 0}
           />
         )}
 
