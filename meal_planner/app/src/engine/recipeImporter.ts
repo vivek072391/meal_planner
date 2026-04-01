@@ -102,7 +102,8 @@ export function isCloudflareBlockedError(e: unknown): boolean {
 /** Parse schema.org Recipe JSON-LD from an HTML page */
 function parseRecipeFromHtml(html: string, sourceUrl: string): Partial<Recipe> {
   // Extract all JSON-LD blocks
-  const scriptRegex = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  // Quotes around type attribute are optional in HTML5 (e.g. type=application/ld+json)
+  const scriptRegex = /<script[^>]*\btype=["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi;
   let match: RegExpExecArray | null;
   const candidates: unknown[] = [];
 
