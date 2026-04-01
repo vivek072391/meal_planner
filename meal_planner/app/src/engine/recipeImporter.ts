@@ -75,13 +75,15 @@ export async function importFromUrl(url: string): Promise<Partial<Recipe>> {
     throw new Error('The page returned no content. Try the Paste Text option instead.');
   }
 
-  // Detect Cloudflare / bot-protection challenge pages
-  if (
+  // Detect Cloudflare blocking challenge pages.
+  // Note: 'challenge-platform' appears in Cloudflare's analytics script on ALL CF sites,
+  // so we only flag pages that show the actual blocking UI (short page + challenge text).
+  const looksLikeChallengePage = html.length < 15000 && (
     html.includes('Just a moment') ||
-    html.includes('challenge-platform') ||
     html.includes('Enable JavaScript and cookies to continue') ||
     html.includes('cf-browser-verification')
-  ) {
+  );
+  if (looksLikeChallengePage) {
     const err = new Error('CLOUDFLARE_BLOCKED');
     (err as Error & { isCloudflareBlocked: boolean }).isCloudflareBlocked = true;
     throw err;
