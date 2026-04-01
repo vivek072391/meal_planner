@@ -29,23 +29,46 @@ export function isBlockedSite(url: string): string | null {
   }
 }
 
+/** Fetch HTML via a CORS proxy, trying multiple proxies with fallback */
+async function fetchViaProxy(url: string): Promise<string> {
+  const encoded = encodeURIComponent(url);
+
+  // Primary: codetabs — returns raw HTML, fast and reliable
+  try {
+    const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encoded}`, {
+      signal: AbortSignal.timeout(12000),
+    });
+    if (res.ok) {
+      const text = await res.text();
+      if (text.length > 500) return text;
+    }
+  } catch { /* fall through */ }
+
+  // Fallback: allorigins — wraps response in JSON
+  try {
+    const res = await fetch(`https://api.allorigins.win/get?url=${encoded}`, {
+      signal: AbortSignal.timeout(12000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text: string = data.contents ?? '';
+      if (text.length > 500) return text;
+    }
+  } catch { /* fall through */ }
+
+  throw new Error('Could not reach the page via any proxy. Check your connection and try again.');
+}
+
 /**
  * Fetch a recipe URL and attempt to extract schema.org/Recipe JSON-LD.
  * Returns a partial Recipe on success, throws on failure.
  */
 export async function importFromUrl(url: string): Promise<Partial<Recipe>> {
-  // Use allorigins.win — free CORS proxy that wraps response in JSON
-  const proxied = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
   let html: string;
   try {
-    const res = await fetch(proxied);
-    if (!res.ok) throw new Error(`Proxy returned ${res.status}`);
-    const data = await res.json();
-    html = data.contents ?? '';
-  } catch {
-    throw new Error(
-      'Could not reach the page. Check your internet connection and try again.'
-    );
+    html = await fetchViaProxy(url);
+  } catch (e) {
+    throw new Error((e as Error).message);
   }
 
   if (!html || html.length < 500) {
