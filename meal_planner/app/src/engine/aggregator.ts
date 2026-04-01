@@ -54,7 +54,8 @@ function depluralize(word: string): string {
 
 function canonicalize(raw: string): string {
   let s = raw.trim().toLowerCase().replace(/\s+/g, ' ');
-  s = s.replace(/\s*\([^)]*\)/g, '').trim();  // remove "(softened)" etc.
+  s = s.replace(/\s*\([^)]*\)/g, '').trim();   // remove complete "(softened)" etc.
+  s = s.replace(/\s*\([^)]*$/, '').trim();     // remove unclosed "( …" with no closing paren
   s = s.replace(/,.*$/, '').trim();             // remove ", minced" etc.
   if (ALIASES[s]) return ALIASES[s];
   const words = s.split(' ');
