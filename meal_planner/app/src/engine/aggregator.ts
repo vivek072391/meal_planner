@@ -88,11 +88,11 @@ const WEIGHT_TO_G: Record<string, number> = {
 
 type BaseUnit = 'ml' | 'g' | string;
 
-function toBase(qty: number, unit: string): { baseQty: number; baseUnit: BaseUnit } {
-  const u = unit.trim().toLowerCase();
+function toBase(qty: number, unit: string | undefined): { baseQty: number; baseUnit: BaseUnit } {
+  const u = (unit ?? '').trim().toLowerCase();
   if (u in VOLUME_TO_ML) return { baseQty: qty * VOLUME_TO_ML[u], baseUnit: 'ml' };
   if (u in WEIGHT_TO_G)  return { baseQty: qty * WEIGHT_TO_G[u],  baseUnit: 'g'  };
-  return { baseQty: qty, baseUnit: u };
+  return { baseQty: qty, baseUnit: u || 'unit' };
 }
 
 /** Convert a base quantity back to the most reader-friendly display unit. */
@@ -134,11 +134,13 @@ export function generateShoppingList(
     if (!slot.recipeId) continue;
     const recipe = recipeMap.get(slot.recipeId);
     if (!recipe) continue;
-    const scale = slot.servings / recipe.servings;
+    const scale = recipe.servings > 0 ? slot.servings / recipe.servings : 1;
 
     for (const ing of recipe.ingredients) {
+      if (!ing.name) continue; // skip any blank ingredient rows
       const canonName = canonicalize(ing.name);
-      const { baseQty, baseUnit } = toBase(ing.quantity * scale, ing.unit);
+      const qty = (ing.quantity ?? 0) * scale;
+      const { baseQty, baseUnit } = toBase(qty, ing.unit);
       const key = `${canonName}||${baseUnit}`;
 
       const existing = aggregated.get(key);

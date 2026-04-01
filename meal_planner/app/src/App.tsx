@@ -150,12 +150,20 @@ export default function App() {
   }, []);
 
   const handleRefreshShoppingList = useCallback(async () => {
-    if (!activeWeekStart) return;
-    const plan = allPlans.get(activeWeekStart);
+    // Find the plan to use — prefer activeWeekStart, fall back to most recent plan
+    const weekStart = activeWeekStart
+      ?? [...allPlans.keys()].sort((a, b) => b.localeCompare(a))[0];
+    if (!weekStart) return;
+    const plan = allPlans.get(weekStart);
     if (!plan) return;
-    const list = generateShoppingList(plan, recipes, pantryItems);
-    await db.shoppingLists.put(list);
-    setShoppingList(list);
+    try {
+      const list = generateShoppingList(plan, recipes, pantryItems);
+      await db.shoppingLists.put(list);
+      setShoppingList(list);
+    } catch (err) {
+      console.error('Failed to refresh shopping list:', err);
+      alert('Could not refresh the shopping list. Check the browser console for details.');
+    }
   }, [activeWeekStart, allPlans, recipes, pantryItems]);
 
   const handleSaveProfile = useCallback(async (p: UserProfile) => {
