@@ -3,6 +3,7 @@ import { generateId } from '../utils';
 
 // Sites known to block automated access (Cloudflare or similar bot protection)
 const BLOCKED_SITES = [
+  // Cloudflare bot-protection
   'allrecipes.com',
   'simplyrecipes.com',
   'seriouseats.com',
@@ -11,6 +12,8 @@ const BLOCKED_SITES = [
   'nytimes.com/recipes',
   'epicurious.com',
   'tasty.co',
+  // BigScoots managed hosting firewall
+  'iwashyoudry.com',
 ];
 
 /** Detect if a URL is an Instagram post/reel */
@@ -75,15 +78,28 @@ export async function importFromUrl(url: string): Promise<Partial<Recipe>> {
     throw new Error('The page returned no content. Try the Paste Text option instead.');
   }
 
-  // Detect Cloudflare blocking challenge pages.
-  // Note: 'challenge-platform' appears in Cloudflare's analytics script on ALL CF sites,
-  // so we only flag pages that show the actual blocking UI (short page + challenge text).
-  const looksLikeChallengePage = html.length < 15000 && (
-    html.includes('Just a moment') ||
-    html.includes('Enable JavaScript and cookies to continue') ||
-    html.includes('cf-browser-verification')
-  );
-  if (looksLikeChallengePage) {
+  // Detect bot-protection / firewall challenge pages from any provider.
+  // We check for short pages (actual recipe pages are typically >50KB) combined
+  // with known security-page fingerprints.
+  const isSecurityPage =
+    // Cloudflare challenge
+    (html.length < 15000 && (
+      html.includes('Just a moment') ||
+      html.includes('Enable JavaScript and cookies to continue') ||
+      html.includes('cf-browser-verification')
+    )) ||
+    // BigScoots / generic managed hosting firewall
+    html.includes('Safeguarding Your Website') ||
+    html.includes('BigScoots') ||
+    // Generic: noindex + nofollow on a short page with no recipe data = security page
+    (html.length < 50000 &&
+      html.includes('noindex') &&
+      html.includes('nofollow') &&
+      !html.includes('recipeIngredient') &&
+      !html.includes('itemprop') &&
+      !html.includes('ld+json'));
+
+  if (isSecurityPage) {
     const err = new Error('CLOUDFLARE_BLOCKED');
     (err as Error & { isCloudflareBlocked: boolean }).isCloudflareBlocked = true;
     throw err;
